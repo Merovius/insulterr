@@ -4,7 +4,7 @@ insulterr - insult the user with every errormessage
 I had a discussion earlier about modern \*nix-users using stuff like automatic
 zsh typo correction or capitalisation-independent completion. During this
 discussion I said something along the lines of „I want my shell to tell me,
-when I have a typo. I want it to tell me, what an idiot I have bin and that I
+when I have a typo. I want it to tell me, what an idiot I have been and that I
 suck, so I don't repeat my mistakes“. This is now finally possible.
 
 insulterr is a small LD\_PRELOAD-library, that replaces funktions like
