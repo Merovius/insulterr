@@ -5,7 +5,7 @@ ifndef PREFIX
 	PREFIX=/usr
 endif
 
-INSULTERR_CFLAGS  = -std=c99
+INSULTERR_CFLAGS  = -std=gnu99
 INSULTERR_CFLAGS += -Wall
 INSULTERR_CFLAGS += -Wunused-value
 INSULTERR_CFLAGS += -fPIC
@@ -13,7 +13,6 @@ INSULTERR_CFLAGS += -fPIC
 INSULTERR_LDFLAGS  = -shared
 INSULTERR_LDFLAGS += -ldl
 INSULTERR_LDFLAGS += -Wl,-init,init
-
 
 V ?= 0
 ifeq ($(V),0)
