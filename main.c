@@ -7,12 +7,93 @@
 #include <stdarg.h>
 #include <error.h>
 #include <stdint.h>
+#include <alloca.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <time.h>
 
-static char buffer[4096];
-static char *(*orig_strerror)(int);
+static char   buffer[4096];
+static char   *(*orig_strerror)(int);
+static char   *insults;
+static int    num_insults;
+static size_t len_insults;
+
+int memcnt(char *haystack, size_t len, char needle) {
+    char *s = haystack;
+    // Inspired by http://stackoverflow.com/a/4235884/1028600 - but without
+    // warnings
+    int i = 0;
+    for (; s < haystack + len; s[i] == needle ? i++ : (intptr_t)(s++));
+    return i;
+}
 
 void init() {
     orig_strerror = dlsym(RTLD_NEXT, "strerror");
+
+    srand(time(NULL));
+
+    char *insultdir = getenv("INSULTERR_DIR");
+    if (insultdir == NULL) {
+        insultdir = "/usr/share/insulterr";
+    }
+
+    int len = strlen(insultdir);
+    char *buf = alloca(len + 8);
+    strncpy(buf, insultdir, len + 8);
+    strncpy(buf + len, "/en.txt", 8);
+    buf[len + 7] = '\0';
+
+    int fd = open(buf, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        error(0, errno, "Could not open insults from %s", buf);
+        goto default_insult;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        error(0, errno, "Could not stat insults file");
+        goto close_file;
+    }
+
+    insults = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (insults == MAP_FAILED) {
+        error(0, errno, "Could not mmap insults file");
+        goto close_file;
+    }
+
+    num_insults = memcnt(insults, st.st_size, '\n');
+    len_insults = st.st_size;
+
+    return;
+
+close_file:
+    close(fd);
+default_insult:
+    insults = "you idiot!\n";
+    num_insults = 1;
+    len_insults = strlen(insults);
+}
+
+char *get_insult(size_t *len) {
+    int max = RAND_MAX - (RAND_MAX % num_insults);
+    int n;
+    do {
+        n = rand();
+    } while (n >= max);
+    n = n % num_insults;
+
+    char *s = insults;
+    for (int i = 0; i < n; i++) {
+        while (*s != '\n') s++;
+        s++;
+    }
+
+    char *e = strchr(s, '\n');
+    *len = e-s;
+    return s;
 }
 
 void error(int status, int errnum, const char *format, ...) {
@@ -33,7 +114,9 @@ void error(int status, int errnum, const char *format, ...) {
         fprintf(stderr, ": %s", orig_strerror(errnum));
     }
 
-    fprintf(stderr, ", you idiot!\n");
+    size_t len;
+    char *insult = get_insult(&len);
+    fprintf(stderr, ", %.*s\n", (int)len, insult);
 
     if (status != 0) {
         exit(status);
@@ -41,11 +124,15 @@ void error(int status, int errnum, const char *format, ...) {
 }
 
 void perror(const char *s) {
-    fprintf(stderr, "%s: %s, you idiot!\n", s, orig_strerror(errno));
+    size_t len;
+    char *insult = get_insult(&len);
+    fprintf(stderr, "%s: %s, %.*s\n", s, orig_strerror(errno), (int)len, insult);
 }
 
 char *strerror(int errnum) {
     char *emsg = orig_strerror(errnum);
-    snprintf(buffer, 4096, "%s, you idiot!", emsg);
+    size_t len;
+    char *insult = get_insult(&len);
+    snprintf(buffer, 4096, "%s, %.*s", emsg, (int)len, insult);
     return buffer;
 }

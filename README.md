@@ -13,13 +13,21 @@ error-message. Using it globally in your session makes every tools using one of
 these functions (which is at least everything in the linux corutils) append an
 insult to error-messages like „no such file or directory“.
 
+insulterr looks up a files of localized insults from a directory named in the
+environment variable `INSULTERR_DIR` (the locale is not used yet). In the file
+there should be one insult per line (with a terminating newline). insulterr
+will then choose a random error message from this file on every error.
+
 
 Building and installing
 =======================
 
 ```sh
 $ make
-$ cp insulterr.so $(HOME)/insulterr.so
+$ mkdir $(HOME)/.insulterr
+$ cp insulterr.so $(HOME)/.insulterr/insulterr.so
+$ cp insults $(HOME)/.insulterr
+$ echo "INSULTERR_DIR=${HOME}/.insulterr/insults" >> ~/.profile
 $ echo "LD_PRELOAD=${HOME}/insulterr.so" >> ~/.profile
 ```
 
@@ -37,7 +45,6 @@ TODO
 There is still a lot of work needed to make this a usefull tool. The following
 is a short list of stuff, I intend to add over the next few days/weeks:
 
-* Randomized insults (currently, the only insult is „you idiot!“
 * Localized insults (using LC\_MESSAGES to display insults in the preferred
   language of the user
 * Replacing error messages of (at least) zsh (for example, unknown commands do
