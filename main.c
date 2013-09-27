@@ -15,19 +15,46 @@
 #include <fcntl.h>
 #include <time.h>
 
-static char   buffer[4096];
-static char   *(*orig_strerror)(int);
-static char   *insults;
-static int    num_insults;
-static size_t len_insults;
+#define DEFAULT_INSULT "you idiot!"
 
-int memcnt(char *haystack, size_t len, char needle) {
+typedef struct index_t {
+    int    num_insults;
+    size_t len_insults;
+    off_t  offs[];
+} __attribute__((packed)) index_t;
+
+static char    buffer[4096];
+static char    *(*orig_strerror)(int);
+static char    *insults;
+static index_t *idx;
+
+static int memcnt(char *haystack, size_t len, char needle) {
     char *s = haystack;
     // Inspired by http://stackoverflow.com/a/4235884/1028600 - but without
     // warnings
     int i = 0;
     for (; s < haystack + len; s[i] == needle ? i++ : (intptr_t)(s++));
     return i;
+}
+
+static index_t *build_index(char *file, size_t len) {
+    int num = memcnt(file, len, '\n');
+
+    index_t *idx = malloc(sizeof(index_t) + (num+1) * sizeof(size_t));
+    if (idx == NULL) {
+        return NULL;
+    }
+
+    idx->len_insults = len;
+    idx->num_insults = num;
+
+    int i = 0;
+    for (char *s = file; s < file + len; s++) {
+        if (*s == '\n') {
+            idx->offs[++i] = s - file + 1;
+        }
+    }
+    return idx;
 }
 
 void init() {
@@ -64,35 +91,32 @@ void init() {
         goto close_file;
     }
 
-    num_insults = memcnt(insults, st.st_size, '\n');
-    len_insults = st.st_size;
+    idx = build_index(insults, st.st_size);
 
     return;
 
 close_file:
     close(fd);
 default_insult:
-    insults = "you idiot!\n";
-    num_insults = 1;
-    len_insults = strlen(insults);
+    idx = NULL;
 }
 
-char *get_insult(size_t *len) {
-    int max = RAND_MAX - (RAND_MAX % num_insults);
+static char *get_insult(size_t *len) {
+    if (idx == NULL) {
+        *len = strlen(DEFAULT_INSULT);
+        return DEFAULT_INSULT;
+    }
+
+    int max = RAND_MAX - (RAND_MAX % idx->num_insults);
     int n;
     do {
         n = rand();
     } while (n >= max);
-    n = n % num_insults;
+    n = n % idx->num_insults;
 
-    char *s = insults;
-    for (int i = 0; i < n; i++) {
-        while (*s != '\n') s++;
-        s++;
-    }
+    char *s = insults + idx->offs[n];
+    *len = idx->offs[n+1]-idx->offs[n]-1;
 
-    char *e = strchr(s, '\n');
-    *len = e-s;
     return s;
 }
 
