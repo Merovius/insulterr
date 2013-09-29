@@ -57,6 +57,92 @@ static index_t *build_index(char *file, size_t len) {
     return idx;
 }
 
+static char *get_primary_language(ssize_t *len) {
+    char *l;
+    #define test_env(str) do { \
+        l = getenv(str); \
+        if (l == NULL) { \
+            break; \
+        } \
+        *len = strlen(l); \
+        char *_ = memchr(l, '_', *len); \
+        if (_ != NULL) { \
+            *len = _ - l; \
+        } \
+        if (*len == 0) { \
+            break; \
+        } \
+        return l; \
+    } while (0)
+
+    test_env("LC_ALL");
+    test_env("LC_MESSAGES");
+    test_env("LANG");
+
+    #undef test_env
+
+    *len = 1;
+    return "C";
+}
+
+static char *get_lang(ssize_t *len) {
+    char *p = getenv("LANGUAGE");
+    if (p == NULL || strlen(p) == 0) {
+        return get_primary_language(len);
+    }
+    *len = strlen(p);
+    return p;
+}
+
+static char *memchrnul(char *s, char c, size_t len) {
+    char *r = memchr(s, c, len);
+    if (r == NULL) {
+        return s + len;
+    }
+    return r;
+}
+
+static int open_db() {
+    char *insultdir = getenv("INSULTERR_DIR");
+    if (insultdir == NULL) {
+        insultdir = "/usr/share/insulterr";
+    }
+
+    int dl = strlen(insultdir);
+    if (insultdir[dl - 1] == '/') {
+        dl--;
+    }
+
+    ssize_t ll;
+    char *l = get_lang(&ll);
+
+    char *buf = alloca(dl + ll + 6);
+    memcpy(buf, insultdir, dl);
+    buf[dl++] = '/';
+
+    do {
+        char *e = memchrnul(l, ':', ll);
+
+        if (memcmp(l, "C", e - l > 2 ? e - l : 2)) {
+            memcpy(buf + dl, l, e - l);
+            memcpy(buf + dl + (e - l), ".txt", 5);
+        } else {
+            memcpy(buf + dl, "en", 2);
+            memcpy(buf + dl + 2, ".txt", 5);
+        }
+
+        int fd = open(buf, O_RDONLY | O_CLOEXEC);
+        if (fd >= 0) {
+            return fd;
+        }
+
+        ll -= (e - l) + 1;
+        l = e + 1;
+    } while (ll > 0);
+    return -1;
+}
+
+
 void init() {
     orig_strerror = dlsym(RTLD_NEXT, "strerror");
 
@@ -73,7 +159,7 @@ void init() {
     strncpy(buf + len, "/en.txt", 8);
     buf[len + 7] = '\0';
 
-    int fd = open(buf, O_RDONLY | O_CLOEXEC);
+    int fd = open_db();
     if (fd < 0) {
         error(0, errno, "Could not open insults from %s", buf);
         goto default_insult;

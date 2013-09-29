@@ -45,8 +45,6 @@ TODO
 There is still a lot of work needed to make this a usefull tool. The following
 is a short list of stuff, I intend to add over the next few days/weeks:
 
-* Localized insults (using LC\_MESSAGES to display insults in the preferred
-  language of the user
 * Replacing error messages of (at least) zsh (for example, unknown commands do
   not trigger an insult yet)
 * Better installation
