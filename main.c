@@ -51,7 +51,7 @@ static index_t *build_index(char *file, size_t len) {
     int i = 0;
     for (char *s = file; s < file + len; s++) {
         if (*s == '\n') {
-            idx->offs[++i] = s - file + 1;
+            idx->offs[i++] = s - file + 1;
         }
     }
     return idx;
